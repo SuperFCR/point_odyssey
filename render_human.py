@@ -43,13 +43,16 @@ class Blender_render():
                  force_num: int = 3,
                  force_interval: int = 200,
                  views: int = 1,
+                 motion_blur: Optional[float] = None,
                  ):
         self.blender_scene = bpy.context.scene
         self.render_engine = render_engine
         self.use_gpu = use_gpu
         self.scale_factor = 10 if not use_indoor_cam else 1
 
+        self.motion_blur = motion_blur 
         self.set_render_engine()
+        
         hdr_list = os.listdir(background_hdr_path)
         hdr_list = [os.path.join(background_hdr_path, x) for x in hdr_list if '.hdr' in x or '.exr' in x]
         self.scratch_dir = scratch_dir
@@ -90,6 +93,7 @@ class Blender_render():
 
         self.views = views
 
+
         # self.blender_scene.render.resolution_percentage = 100
         if background_hdr_path:
             print('loading hdr from:', self.background_hdr_path)
@@ -114,7 +118,6 @@ class Blender_render():
 
             # if cuda arch use cuda, else use metal
             bpy.context.preferences.addons["cycles"].preferences.compute_device_type = "CUDA"
-
             bpy.context.preferences.addons["cycles"].preferences.get_devices()
             print(bpy.context.preferences.addons["cycles"].preferences.compute_device_type)
 
@@ -124,6 +127,17 @@ class Blender_render():
                 print("Device '{}' type {} : {}".format(d.name, d.type, d.use))
             print('setting up gpu done')
             print("----------------------------------------------")
+
+        if self.motion_blur:
+            assert self.motion_blur > 0.0 and self.motion_blur <= 1.0, f'self.motion_blur: {self.motion_blur}...'
+            bpy.context.scene.render.use_motion_blur = True
+            bpy.context.scene.render.motion_blur_shutter = self.motion_blur
+        else:
+            bpy.context.scene.render.use_motion_blur = False
+        print("----------------------------------------------")
+        print(f"motion blur mode: {self.motion_blur}")
+
+
 
     def setup_scene(self):
         bpy.ops.object.camera_add()
@@ -306,9 +320,11 @@ class Blender_render():
 
             imported_object.rigid_body.mass = 0.5 * scale / self.scale_factor
             # bpy.ops.object.modifier_add(type='COLLISION')
+        
         print('GSO assets loaded')
         print('loading partnet assets')
         print(partnet_assets)
+        
         for j, obj_path in enumerate(partnet_assets):
             parts = os.listdir(os.path.join(obj_path, 'objs'))
             part_objs = []
@@ -481,7 +497,32 @@ class Blender_render():
         out_node.file_slots.new("Vector")
         links.new(render_node_aux.outputs.get("Vector"), split_rgba.inputs.get("Image"))
         links.new(combine_rgba.outputs.get("Image"), out_node.inputs.get("Vector"))
+
+        # TODO: Motion Blur
+        if self.motion_blur is not None:
+            assert isinstance(self.motion_blur, float), self.motion_blur
+            # Add optic-based motion blur node...
+            motion_blur_node = tree.nodes.new(type="CompositorNodeVecBlur")
+            composite_out = tree.nodes.new(type="CompositorNodeComposite")
+            motion_blur_node.factor = self.motion_blur
+            motion_blur_node.use_curved = True
+            links.new(render_node.outputs.get("Image"), motion_blur_node.inputs.get("Image"))
+            links.new(render_node.outputs.get("Depth"), motion_blur_node.inputs.get("Z"))
+            links.new(render_node_aux.outputs.get("Vector"), motion_blur_node.inputs.get("Speed"))
+            
+            # alter the input of node...
+            links.remove(out_node.inputs.get("Image").links[0])
+            links.new(motion_blur_node.outputs.get("Image"), out_node.inputs.get("Image"))
+            links.new(motion_blur_node.outputs.get("Image"), composite_out.inputs.get("Image"))
         return out_node
+
+        '''
+            bpy.context.scene.render.engine = 'CYCLES'
+            bpy.context.scene.render.use_motion_blur = True
+            bpy.context.scene.cycles.motion_blur_position = 'START'
+            bpy.context.scene.cycles.motion_blur_position = 'CENTER'
+            bpy.context.scene.render.motion_blur_shutter = 0.5
+        '''
 
     def set_exr_output_path(self, path_prefix: Optional[str]):
         """Set the target path prefix for EXR output.
@@ -977,6 +1018,8 @@ if __name__ == "__main__":
     parser.add_argument('--indoor', action='store_true', default=False)
     parser.add_argument('--views', type=int, default=1)
     parser.add_argument('--render_engine', type=str, default='CYCLES', choices=['BLENDER_EEVEE', 'CYCLES'])
+    parser.add_argument('--motion_blur', type=float, default=None,
+                    help='Set the motion blur factor (e.g., 0.5). If not set, motion blur is disabled.')
     args = parser.parse_args(argv)
     print("args:{0}".format(args))
 
@@ -988,7 +1031,7 @@ if __name__ == "__main__":
                               camera_path=args.camera_root, background_hdr_path=args.background_hdr_path, GSO_path=args.gso_root, num_assets=args.num_assets,
                               custom_scene=args.scene_root, use_indoor_cam=args.indoor, partnet_path=args.partnet_root, use_character=args.use_character,
                               add_force=args.add_force, force_step=args.force_step, force_interval=args.force_interval, force_num=args.force_num,
-                              views=args.views)
+                              views=args.views, motion_blur=args.motion_blur)
 
     renderer.render()
 

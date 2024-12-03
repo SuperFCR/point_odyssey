@@ -147,7 +147,6 @@ def add_coordinate_material():
                           aov_out_node.inputs.get("Color"))
   mat.node_tree.links.new(tex_coordinates.outputs.get("Generated"),
                           unused_mat_out_node.inputs.get("Surface"))
-
   return mat
 
 

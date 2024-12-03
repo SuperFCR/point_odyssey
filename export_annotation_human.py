@@ -43,6 +43,9 @@ if __name__ == '__main__':
     # export dynamic mask settings
     parser.add_argument('--export_dynamic_mask',  default=False, action='store_true')
 
+    # export blurry formation
+    parser.add_argument("--motion_blur", type=float, default=None,
+                        help='Set the motion blur factor (e.g., 0.5). If not set, motion blur is disabled.')
     args = parser.parse_args()
 
 
@@ -60,6 +63,11 @@ if __name__ == '__main__':
             rendering_script += ' --use_gpu'
         if args.indoor_scale:
             rendering_script += ' --indoor'
+        # TODO: Add motion blur module
+        if args.motion_blur:
+            rendering_script += ' --motion_blur {}'.format(args.motion_blur)
+        print("----------------------------------------------")
+        print(f"Rendering script: {rendering_script}")
         os.system(rendering_script)
     if args.export_obj:
         obj_script = './blender-3.2.2-linux-x64/blender  --background --python {}/utils/export_obj.py \
@@ -79,12 +87,3 @@ if __name__ == '__main__':
             tracking_script = 'python -m utils.gen_tracking --data_root {} --cp_root {} --sampling_points {} --sampling_scene_points {}'.format(
                 args.output_dir, args.output_dir, args.sampling_points, args.sampling_scene_points)
             os.system(tracking_script)
-
-    # TODO: Add 2D dynamic and static mask
-    # export dynamic mask settings
-    if args.export_dynamic_mask:
-        dynamic_mask_script = 'python -m utils.gen_dynamic_mask --data_root {} --output_dir {}'.format(
-            args.output_dir, os.path.join(args.output_dir, 'dynamic_mask'))
-        os.system(dynamic_mask_script)
-    # TODO: Add motion blur module
-    

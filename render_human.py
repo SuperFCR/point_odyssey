@@ -52,7 +52,7 @@ class Blender_render():
 
         self.motion_blur = motion_blur 
         self.set_render_engine()
-        
+
         hdr_list = os.listdir(background_hdr_path)
         hdr_list = [os.path.join(background_hdr_path, x) for x in hdr_list if '.hdr' in x or '.exr' in x]
         self.scratch_dir = scratch_dir
@@ -498,7 +498,7 @@ class Blender_render():
         links.new(render_node_aux.outputs.get("Vector"), split_rgba.inputs.get("Image"))
         links.new(combine_rgba.outputs.get("Image"), out_node.inputs.get("Vector"))
 
-        # TODO: Motion Blur
+        # TODO: Motion Blur Module
         if self.motion_blur is not None:
             assert isinstance(self.motion_blur, float), self.motion_blur
             # Add optic-based motion blur node...
@@ -689,7 +689,6 @@ class Blender_render():
                         obj.keyframe_insert(data_path="rotation_euler", frame=f)
                     # bake to keyframe
                     obj.keyframe_insert(data_path="location", frame=f)
-
                 print("Baking frame %d" % f)
 
             # remove baked objects from simulation

@@ -63,7 +63,7 @@ if __name__ == '__main__':
             rendering_script += ' --use_gpu'
         if args.indoor_scale:
             rendering_script += ' --indoor'
-        # TODO: Add motion blur module
+        # NOTE: Add motion blur module
         if args.motion_blur:
             rendering_script += ' --motion_blur {}'.format(args.motion_blur)
         print("----------------------------------------------")

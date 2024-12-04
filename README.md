@@ -1,4 +1,10 @@
 # PointOdyssey: A Large-Scale Synthetic Dataset for Long-Term Point Tracking
+### 🔥News
+
+- Add motion blur mode.
+
+- Add the rendering using given camera trajectory.
+
 ![teaser](assets/teaser.gif)
 
 This code implements the data generation pipeline of our PointOdyssey dataset.

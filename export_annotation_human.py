@@ -59,6 +59,7 @@ if __name__ == '__main__':
             current_path, args.output_dir, args.character_root, args.partnet_root, args.gso_root,
             args.background_hdr_path, args.scene_root, args.camera_root, args.num_assets,
             args.render_engine, args.force_num, args.force_step, args.force_interval)
+        
         if args.use_gpu:
             rendering_script += ' --use_gpu'
         if args.indoor_scale:
@@ -69,21 +70,25 @@ if __name__ == '__main__':
         print("----------------------------------------------")
         print(f"Rendering script: {rendering_script}")
         os.system(rendering_script)
+
     if args.export_obj:
         obj_script = './blender-3.2.2-linux-x64/blender  --background --python {}/utils/export_obj.py \
          -- --scene_root {} --output_dir {}'.format(
             current_path, os.path.join(args.output_dir, 'scene.blend'), args.output_dir)
+        print("----------------------------------------------")
+        print(f"Object export: {obj_script}")
         os.system(obj_script)
+
     if args.exr:
         exr_script = 'python -m utils.openexr_utils --data_dir {} --output_dir {} --batch_size {} --frame_idx {}'.format(
             args.output_dir, args.output_dir + '/exr_img', args.batch_size, args.frame_idx)
+        print("----------------------------------------------")
+        print(f"Exr script: {exr_script}")
         os.system(exr_script)
 
     if args.export_tracking:
         tracking_script = 'python -m utils.gen_tracking --data_root {} --cp_root {} --sampling_points {} --sampling_scene_points {}'.format(
             args.output_dir, args.output_dir, args.sampling_points, args.sampling_scene_points)
+        print("----------------------------------------------")
+        print(f"tracking_script: {tracking_script}")
         os.system(tracking_script)
-        if args.export_tracking:
-            tracking_script = 'python -m utils.gen_tracking --data_root {} --cp_root {} --sampling_points {} --sampling_scene_points {}'.format(
-                args.output_dir, args.output_dir, args.sampling_points, args.sampling_scene_points)
-            os.system(tracking_script)

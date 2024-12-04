@@ -368,6 +368,12 @@ class Blender_render():
         frames = range(frames[0], bpy.context.scene.frame_end + 1)
 
         use_multiview = self.views > 1
+
+        # transforms
+        transforms_data = {
+            "camera_angle_x": bpy.data.objects['Camera'].data.angle_x,
+            "frames": []
+        }
         if not use_multiview:
             for frame_nr in frames:
                 bpy.context.scene.frame_set(frame_nr)
@@ -380,6 +386,15 @@ class Blender_render():
                 modelview_matrix = bpy.context.scene.camera.matrix_world.inverted()
                 K = get_calibration_matrix_K_from_blender(bpy.context.scene, mode='simple')
                 # K = get_intrinsics(bpy.context.scene)
+
+                # pose json
+                transform_matrix = [list(row) for row in modelview_matrix]
+                frame_data = {
+                    "file_path": os.path.join("images", f"frame_{frame_nr:04d}.png"),
+                    "time": frame_nr / bpy.context.scene.frame_end,
+                    "transform_matrix": transform_matrix
+                }
+                transforms_data["frames"].append(frame_data)
                 np.savetxt(os.path.join(camera_save_dir, f"RT_{frame_nr:04d}.txt"), modelview_matrix)
                 np.savetxt(os.path.join(camera_save_dir, f"K_{frame_nr:04d}.txt"), K)
 
@@ -483,9 +498,23 @@ class Blender_render():
                     modelview_matrix = bpy.context.scene.camera.matrix_world.inverted()
                     K = get_calibration_matrix_K_from_blender(bpy.context.scene, mode='simple')
 
+                    # pose json
+                    transform_matrix = [list(row) for row in modelview_matrix]
+                    frame_data = {
+                        "file_path": os.path.join("images", f"frame_{frame_nr:04d}.png"),
+                        "time": frame_nr / bpy.context.scene.frame_end,
+                        "transform_matrix": transform_matrix
+                    }
+                    transforms_data["frames"].append(frame_data)
+
                     np.savetxt(os.path.join(camera_save_dir, f"RT_{frame_nr:04d}.txt"), modelview_matrix)
                     np.savetxt(os.path.join(camera_save_dir, f"K_{frame_nr:04d}.txt"), K)
                     print("Rendered frame '%s'" % bpy.context.scene.render.filepath)
+            
+            with open(os.path.join(self.scratch_dir, 'transforms.json'), 'w') as f:
+                json.dump(transforms_data, f, indent=4)
+
+            print("Transforms.json has been saved to '%s'" % os.path.join(self.scratch_dir, 'transforms.json'))
 
 
 def get_calibration_matrix_K_from_blender(scene, mode='simple'):

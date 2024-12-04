@@ -10,7 +10,6 @@ import time
 import sys
 import glob
 import json
-
 FOCAL_LENGTH = 30
 SENSOR_WIDTH = 50
 RESULOUTION_X = 960
@@ -501,6 +500,7 @@ class Blender_render():
         # TODO: Motion Blur Module
         if self.motion_blur is not None:
             assert isinstance(self.motion_blur, float), self.motion_blur
+            print(f"exr motion blur factor: {self.motion_blur}")
             # Add optic-based motion blur node...
             motion_blur_node = tree.nodes.new(type="CompositorNodeVecBlur")
             composite_out = tree.nodes.new(type="CompositorNodeComposite")
@@ -787,9 +787,8 @@ class Blender_render():
         self.clear_scene()
 
         absolute_path = os.path.abspath(self.scratch_dir)
-
         frames = range(bpy.context.scene.frame_start, bpy.context.scene.frame_end + 1)
-
+        print(f"frames len:{len(frames)}")
         # add forces
         for frame_nr in frames:
             if frame_nr % self.force_interval == 1 and self.add_force:
@@ -843,8 +842,14 @@ class Blender_render():
         use_multiview = self.views > 1
 
         self.set_exr_output_path(os.path.join(self.scratch_dir, "exr", "frame_"))
-        # --- starts rendering
 
+        # transforms
+        transforms_data = {
+            "camera_angle_x": bpy.data.objects['Camera'].data.angle_x,
+            "frames": []
+        }
+
+        # --- starts rendering
         if not use_multiview:
             camera_save_dir = os.path.join(self.scratch_dir, 'cam')
             obj_save_dir = os.path.join(self.scratch_dir, 'obj')
@@ -854,22 +859,35 @@ class Blender_render():
             camera_files = glob.glob(os.path.join(self.camera_path, '*/*.txt'))
             # filter out small files
             camera_files = [c for c in camera_files if os.path.getsize(c) > 5000]
-            camera_file = np.random.choice(camera_files)
+            camera_file = np.random.choice(camera_files) 
             print('camera file: ', camera_file)
+
+            # print(f"camera file list:{camera_files}")
+            # TODO: need to set
+            set_txt = "/remote-home1/tangzhenyu/aigc/Compression/code_space/fcr_proj/evags4d/datamaker/point_odyssey/data/camera_trajectory/MannequinChallenge/train/ef441bf1a2008f25.txt"
+            camera_file = set_txt
+            
             camera_rt = np.loadtxt(camera_file, skiprows=1)[:, 7:].reshape(-1, 3, 4)
             self.bake_camera(camera_rt, frames)
 
             bpy.ops.wm.save_as_mainfile(filepath=os.path.join(absolute_path, 'scene.blend'))
             for frame_nr in frames:
                 bpy.context.scene.frame_set(frame_nr)
-
                 bpy.context.scene.render.filepath = os.path.join(
                     self.scratch_dir, "images", f"frame_{frame_nr:04d}.png")
-
                 bpy.ops.render.render(animation=False, write_still=True)
 
                 modelview_matrix = bpy.context.scene.camera.matrix_world.inverted()
                 K = get_calibration_matrix_K_from_blender(bpy.context.scene, mode='simple')
+
+                # pose json
+                transform_matrix = [list(row) for row in modelview_matrix]
+                frame_data = {
+                    "file_path": os.path.join("images", f"frame_{frame_nr:04d}.png"),
+                    "time": frame_nr / bpy.context.scene.frame_end,
+                    "transform_matrix": transform_matrix
+                }
+                transforms_data["frames"].append(frame_data)
 
                 np.savetxt(os.path.join(camera_save_dir, f"RT_{frame_nr:04d}.txt"), modelview_matrix)
                 np.savetxt(os.path.join(camera_save_dir, f"K_{frame_nr:04d}.txt"), K)
@@ -922,10 +940,23 @@ class Blender_render():
 
                     modelview_matrix = bpy.context.scene.camera.matrix_world.inverted()
                     K = get_calibration_matrix_K_from_blender(bpy.context.scene, mode='simple')
+                    transform_matrix = [list(row) for row in modelview_matrix]
+
+                    frame_data = {
+                        "file_path": os.path.join(f"view{i}", "images", f"frame_{frame_nr:04d}.png"),
+                        "time": frame_nr / bpy.context.scene.frame_end,
+                        "transform_matrix": transform_matrix
+                    }
+                    transforms_data["frames"].append(frame_data)
 
                     np.savetxt(os.path.join(camera_save_dir, f"RT_{frame_nr:04d}.txt"), modelview_matrix)
                     np.savetxt(os.path.join(camera_save_dir, f"K_{frame_nr:04d}.txt"), K)
                     print("Rendered frame '%s'" % bpy.context.scene.render.filepath)
+            
+            with open(os.path.join(self.scratch_dir, 'transforms.json'), 'w') as f:
+                json.dump(transforms_data, f, indent=4)
+
+            print("Transforms.json has been saved to '%s'" % os.path.join(self.scratch_dir, 'transforms.json'))
 
 
 
